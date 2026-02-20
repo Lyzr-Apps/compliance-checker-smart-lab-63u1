@@ -1,17 +1,25 @@
 {
   "agent_name": "Compliance Coordinator",
   "agent_id": "699888d562205d38ecc8323f",
-  "description": "Orchestrates compliance analysis across all sub-agents, aggregates their findings into a unified risk report with severity rankings and prioritized fix suggestions",
+  "description": "Orchestrates exhaustive 360-degree compliance analysis across all sub-agents, aggregates findings into a unified risk report with severity rankings, pre-submission readiness checklist, and prioritized fix suggestions",
   "agent_type": "json",
   "accessor": "result",
   "auto_generated": true,
   "response_schema": {
     "compliance_score": "number",
+    "readiness_status": "string (ready | needs_fixes | high_risk)",
     "risk_summary": {
       "high": "number",
       "medium": "number",
       "low": "number"
     },
+    "readiness_checklist": [
+      {
+        "item": "string",
+        "status": "string (pass | fail | warning | not_applicable)",
+        "details": "string"
+      }
+    ],
     "categories": [
       {
         "category_name": "string",
@@ -35,39 +43,6 @@
         "title": "string",
         "category": "string",
         "action": "string"
-      }
-    ]
-  },
-  "example_response": {
-    "compliance_score": 0,
-    "risk_summary": {
-      "high": 0,
-      "medium": 0,
-      "low": 0
-    },
-    "categories": [
-      {
-        "category_name": "Name of the guideline category",
-        "violations": [
-          {
-            "title": "Short title of the violation",
-            "severity": "Severity level",
-            "guideline_reference": "Apple guideline section reference",
-            "description": "Detailed description of the violation",
-            "affected_code": "The code snippet or config that triggers this violation",
-            "suggested_fix": "Actionable fix suggestion"
-          }
-        ],
-        "category_summary": "Summary for this category"
-      }
-    ],
-    "overall_assessment": "Overall compliance assessment and recommendation",
-    "priority_fixes": [
-      {
-        "priority": 0,
-        "title": "Fix title",
-        "category": "Category this fix belongs to",
-        "action": "What to do"
       }
     ]
   }

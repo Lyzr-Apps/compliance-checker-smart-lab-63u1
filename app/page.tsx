@@ -15,8 +15,9 @@ import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { VscShield, VscCode, VscSearch, VscHistory, VscBook, VscWarning, VscError, VscInfo, VscCheck, VscExport, VscClose, VscPlay, VscFilter, VscRepoForked, VscTrash, VscFile } from 'react-icons/vsc'
+import { VscShield, VscCode, VscSearch, VscHistory, VscBook, VscWarning, VscError, VscInfo, VscCheck, VscExport, VscClose, VscPlay, VscFilter, VscRepoForked, VscTrash, VscFile, VscVerified, VscCircleFilled, VscDash } from 'react-icons/vsc'
 import { HiOutlineShieldCheck, HiOutlineExclamationTriangle, HiOutlineInformationCircle } from 'react-icons/hi2'
+import { HiMiniShieldCheck, HiMiniXCircle, HiMiniExclamationTriangle, HiMiniMinusCircle } from 'react-icons/hi2'
 
 // --- Constants ---
 const MANAGER_AGENT_ID = '699888d562205d38ecc8323f'
@@ -50,9 +51,17 @@ interface RiskSummary {
   low: number
 }
 
+interface ReadinessCheckItem {
+  item: string
+  status: 'pass' | 'fail' | 'warning' | 'not_applicable'
+  details: string
+}
+
 interface AnalysisResult {
   compliance_score: number
+  readiness_status?: 'ready' | 'needs_fixes' | 'high_risk'
   risk_summary: RiskSummary
+  readiness_checklist?: ReadinessCheckItem[]
   categories: Category[]
   overall_assessment: string
   priority_fixes: PriorityFix[]
@@ -114,7 +123,25 @@ function parseGitHubUrl(url: string): { owner: string; repo: string; branch: str
 // --- Sample Data ---
 const SAMPLE_RESULT: AnalysisResult = {
   compliance_score: 72,
+  readiness_status: 'needs_fixes',
   risk_summary: { high: 3, medium: 5, low: 2 },
+  readiness_checklist: [
+    { item: 'Privacy Policy URL configured', status: 'fail', details: 'No privacy policy URL was detected in the app configuration or Info.plist. This is required for apps that collect any user data.' },
+    { item: 'Data collection declarations match actual usage', status: 'warning', details: 'App uses CLLocationManager but location data collection may not be fully declared in App Store Connect privacy nutrition labels.' },
+    { item: 'App Tracking Transparency implemented', status: 'fail', details: 'App appears to access advertising identifiers but ATTrackingManager.requestTrackingAuthorization() was not found in the code.' },
+    { item: 'Account deletion mechanism present', status: 'fail', details: 'No account deletion or data erasure functionality was found. Required since June 2022 for apps with account creation.' },
+    { item: 'In-app purchase terms clearly displayed', status: 'warning', details: 'Subscription pricing page exists but renewal period and cancellation terms are not prominently displayed before the purchase button.' },
+    { item: 'Age rating accurately reflects content', status: 'pass', details: 'Age rating of 4+ appears appropriate for the described app functionality. No mature content detected.' },
+    { item: 'App name follows guidelines', status: 'pass', details: 'App name "PhotoSync Pro" is within the 30-character limit and does not contain generic terms or misleading claims.' },
+    { item: 'Screenshots match actual app UI', status: 'fail', details: 'Screenshots contain Android-style navigation bars and non-Apple device frames that do not match iOS UI standards.' },
+    { item: 'No placeholder or test content', status: 'pass', details: 'No placeholder text, lorem ipsum, or test content was detected in the codebase.' },
+    { item: 'Required purpose strings present', status: 'warning', details: 'NSLocationWhenInUseUsageDescription found but NSPhotoLibraryUsageDescription may be missing for a photo sync app.' },
+    { item: 'Sign in with Apple implemented', status: 'not_applicable', details: 'No third-party login SDK detected. Sign in with Apple is only required when third-party login options are offered.' },
+    { item: 'HTTPS enforced for all network calls', status: 'pass', details: 'No HTTP URLs or ATS exceptions were detected in the code snippets provided.' },
+    { item: 'Accessibility basics covered', status: 'warning', details: 'No explicit VoiceOver accessibility labels or Dynamic Type support was detected. Consider adding accessibility annotations.' },
+    { item: 'No private API usage detected', status: 'pass', details: 'No private framework imports or undocumented API calls were identified in the code.' },
+    { item: 'Background modes justified', status: 'warning', details: 'Background location usage detected. Ensure this mode is declared in Info.plist and justified in App Review notes.' }
+  ],
   categories: [
     {
       category_name: 'Privacy & Data Collection',
@@ -292,6 +319,44 @@ function getScoreLabel(score: number): string {
   return 'Fail'
 }
 
+function getReadinessColor(status: string): string {
+  switch (status) {
+    case 'ready': return 'hsl(135, 94%, 60%)'
+    case 'needs_fixes': return 'hsl(31, 100%, 65%)'
+    case 'high_risk': return 'hsl(0, 100%, 62%)'
+    default: return 'hsl(228, 10%, 62%)'
+  }
+}
+
+function getReadinessLabel(status: string): string {
+  switch (status) {
+    case 'ready': return 'Ready to Submit'
+    case 'needs_fixes': return 'Needs Fixes'
+    case 'high_risk': return 'High Rejection Risk'
+    default: return 'Unknown'
+  }
+}
+
+function getChecklistStatusIcon(status: string) {
+  switch (status) {
+    case 'pass': return <HiMiniShieldCheck className="w-4 h-4 text-green-400 shrink-0" />
+    case 'fail': return <HiMiniXCircle className="w-4 h-4 text-red-400 shrink-0" />
+    case 'warning': return <HiMiniExclamationTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+    case 'not_applicable': return <HiMiniMinusCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+    default: return <VscDash className="w-4 h-4 text-muted-foreground shrink-0" />
+  }
+}
+
+function getChecklistStatusBg(status: string): string {
+  switch (status) {
+    case 'pass': return 'bg-green-500/5 border-green-500/20 hover:bg-green-500/10'
+    case 'fail': return 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10'
+    case 'warning': return 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10'
+    case 'not_applicable': return 'bg-secondary/30 border-border/50 hover:bg-secondary/50'
+    default: return 'bg-secondary/30 border-border/50'
+  }
+}
+
 function getSeverityClasses(severity: string): string {
   switch (severity) {
     case 'high': return 'bg-red-500/20 text-red-400 border-red-500/30'
@@ -383,7 +448,7 @@ function AnalysisLoadingSkeleton() {
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <p className="text-sm text-muted-foreground">Analyzing compliance across guideline categories...</p>
+        <p className="text-sm text-muted-foreground">Performing 360-degree compliance analysis across all guideline categories...</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Skeleton className="h-24 rounded-xl" />
@@ -449,13 +514,21 @@ function ResultsDashboard({ result, onExport, onBack }: { result: AnalysisResult
   const [severityFilter, setSeverityFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
 
+  const [showChecklist, setShowChecklist] = useState(true)
+
   const categories = Array.isArray(result?.categories) ? result.categories : []
   const priorityFixes = Array.isArray(result?.priority_fixes) ? result.priority_fixes : []
+  const readinessChecklist = Array.isArray(result?.readiness_checklist) ? result.readiness_checklist : []
+  const readinessStatus = result?.readiness_status ?? (result?.compliance_score >= 85 ? 'ready' : result?.compliance_score >= 60 ? 'needs_fixes' : 'high_risk')
   const riskHigh = result?.risk_summary?.high ?? 0
   const riskMedium = result?.risk_summary?.medium ?? 0
   const riskLow = result?.risk_summary?.low ?? 0
   const score = result?.compliance_score ?? 0
   const assessment = result?.overall_assessment ?? ''
+  const checklistPassed = readinessChecklist.filter(c => c?.status === 'pass').length
+  const checklistFailed = readinessChecklist.filter(c => c?.status === 'fail').length
+  const checklistWarnings = readinessChecklist.filter(c => c?.status === 'warning').length
+  const checklistNA = readinessChecklist.filter(c => c?.status === 'not_applicable').length
 
   const filteredCategories = categories.map(cat => {
     const violations = Array.isArray(cat?.violations) ? cat.violations : []
@@ -494,6 +567,115 @@ function ResultsDashboard({ result, onExport, onBack }: { result: AnalysisResult
           <RiskCard label="Low Risk" count={riskLow} icon={<VscInfo className="w-5 h-5 text-blue-400" />} colorClass="bg-blue-400/10 border-blue-400/20" glowClass="shadow-[0_0_15px_hsl(191,97%,70%,0.1)]" />
         </div>
       </div>
+
+      {/* Readiness Status Banner */}
+      <Card className={`border shadow-lg overflow-hidden ${
+        readinessStatus === 'ready' ? 'border-green-500/30 shadow-[0_0_20px_hsl(135,94%,60%,0.1)]' :
+        readinessStatus === 'needs_fixes' ? 'border-amber-500/30 shadow-[0_0_20px_hsl(31,100%,65%,0.1)]' :
+        'border-red-500/30 shadow-[0_0_20px_hsl(0,100%,62%,0.1)]'
+      }`}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {readinessStatus === 'ready' ? (
+                <div className="p-2 rounded-full bg-green-500/15"><VscVerified className="w-6 h-6 text-green-400" /></div>
+              ) : readinessStatus === 'needs_fixes' ? (
+                <div className="p-2 rounded-full bg-amber-500/15"><HiOutlineExclamationTriangle className="w-6 h-6 text-amber-400" /></div>
+              ) : (
+                <div className="p-2 rounded-full bg-red-500/15"><VscError className="w-6 h-6 text-red-400" /></div>
+              )}
+              <div>
+                <p className="text-base font-bold tracking-tight" style={{ color: getReadinessColor(readinessStatus) }}>
+                  {getReadinessLabel(readinessStatus)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {readinessStatus === 'ready'
+                    ? 'Your app appears to meet all critical App Store requirements. Proceed with submission.'
+                    : readinessStatus === 'needs_fixes'
+                    ? 'Some issues need attention before submitting. Address the items below to improve your chances.'
+                    : 'Significant issues detected. Submitting now will likely result in rejection.'
+                  }
+                </p>
+              </div>
+            </div>
+            <Badge variant="outline" className="shrink-0 text-xs font-mono" style={{ color: getReadinessColor(readinessStatus), borderColor: getReadinessColor(readinessStatus) }}>
+              {score}/100
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pre-Submission Readiness Checklist */}
+      {readinessChecklist.length > 0 && (
+        <Card className="border-border shadow-lg">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <VscVerified className="w-4 h-4 text-primary" /> Pre-Submission Readiness Checklist
+              </CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold text-green-400">{checklistPassed} passed</span>
+                  <VscCircleFilled className="w-1.5 h-1.5 text-muted-foreground/30" />
+                  <span className="text-[10px] font-semibold text-red-400">{checklistFailed} failed</span>
+                  <VscCircleFilled className="w-1.5 h-1.5 text-muted-foreground/30" />
+                  <span className="text-[10px] font-semibold text-amber-400">{checklistWarnings} warnings</span>
+                  {checklistNA > 0 && (
+                    <>
+                      <VscCircleFilled className="w-1.5 h-1.5 text-muted-foreground/30" />
+                      <span className="text-[10px] font-semibold text-muted-foreground">{checklistNA} N/A</span>
+                    </>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setShowChecklist(!showChecklist)} className="h-7 text-xs text-muted-foreground">
+                  {showChecklist ? 'Collapse' : 'Expand'}
+                </Button>
+              </div>
+            </div>
+            <CardDescription className="text-xs">Every item must pass or be N/A for 100% submission confidence.</CardDescription>
+          </CardHeader>
+          {showChecklist && (
+            <CardContent className="pt-0">
+              {/* Progress bar */}
+              <div className="mb-3">
+                <div className="h-2 rounded-full bg-secondary overflow-hidden flex">
+                  {checklistPassed > 0 && (
+                    <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${(checklistPassed / readinessChecklist.length) * 100}%` }} />
+                  )}
+                  {checklistWarnings > 0 && (
+                    <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${(checklistWarnings / readinessChecklist.length) * 100}%` }} />
+                  )}
+                  {checklistFailed > 0 && (
+                    <div className="h-full bg-red-500 transition-all duration-500" style={{ width: `${(checklistFailed / readinessChecklist.length) * 100}%` }} />
+                  )}
+                  {checklistNA > 0 && (
+                    <div className="h-full bg-muted-foreground/30 transition-all duration-500" style={{ width: `${(checklistNA / readinessChecklist.length) * 100}%` }} />
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {readinessChecklist.map((check, idx) => (
+                  <div key={idx} className={`flex items-start gap-3 p-2.5 rounded-lg border transition-all duration-200 ${getChecklistStatusBg(check?.status ?? '')}`}>
+                    {getChecklistStatusIcon(check?.status ?? '')}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold">{check?.item ?? 'Check item'}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{check?.details ?? ''}</p>
+                    </div>
+                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 shrink-0 uppercase tracking-wider font-bold ${
+                      check?.status === 'pass' ? 'text-green-400 border-green-500/30' :
+                      check?.status === 'fail' ? 'text-red-400 border-red-500/30' :
+                      check?.status === 'warning' ? 'text-amber-400 border-amber-500/30' :
+                      'text-muted-foreground border-border'
+                    }`}>
+                      {check?.status === 'not_applicable' ? 'N/A' : check?.status ?? ''}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Overall Assessment */}
       {assessment && (
@@ -790,6 +972,9 @@ export default function Page() {
   // Sample Data toggle
   const [sampleDataOn, setSampleDataOn] = useState(false)
 
+  // 360 Deep Scan toggle
+  const [deepScan, setDeepScan] = useState(true)
+
   // GitHub repo state
   const [repoUrl, setRepoUrl] = useState('')
   const [repoFiles, setRepoFiles] = useState<RepoFile[]>([])
@@ -989,6 +1174,9 @@ export default function Page() {
   // Build message
   const buildAnalysisMessage = () => {
     let message = ''
+    if (deepScan) {
+      message += `## MODE: 360-DEGREE DEEP SCAN\nPerform an exhaustive 360-degree analysis covering EVERY possible App Store rejection vector. Include the pre-submission readiness checklist with pass/fail/warning status for each item. Leave no stone unturned - I need to be 100% confident this app will pass review.\n\n`
+    }
     const code = sampleDataOn && !codeSnippet.trim() ? 'import UIKit\nimport CoreLocation\n\nclass LocationManager: NSObject, CLLocationManagerDelegate {\n    let manager = CLLocationManager()\n    func startTracking() {\n        manager.requestWhenInUseAuthorization()\n        manager.startUpdatingLocation()\n    }\n}' : codeSnippet
     const desc = sampleDataOn && !appDescription.trim() ? 'A photo synchronization app that backs up your photos to the cloud, with social sharing features and a premium subscription for unlimited storage.' : appDescription
     const name = sampleDataOn && !appName.trim() ? 'PhotoSync Pro' : appName
@@ -1101,10 +1289,23 @@ export default function Page() {
     const categories = Array.isArray(data?.categories) ? data.categories : []
     const priorityFixes = Array.isArray(data?.priority_fixes) ? data.priority_fixes : []
 
-    let report = '# App Store Compliance Report\n\n'
+    const readinessChecklist = Array.isArray(data?.readiness_checklist) ? data.readiness_checklist : []
+
+    let report = '# App Store Compliance Report - 360 Degree Analysis\n\n'
     report += `**Compliance Score:** ${data?.compliance_score ?? 'N/A'}/100\n`
+    report += `**Readiness Status:** ${getReadinessLabel(data?.readiness_status ?? 'unknown')}\n`
     report += `**Generated:** ${new Date().toLocaleString()}\n\n`
     report += `## Risk Summary\n- High: ${data?.risk_summary?.high ?? 0}\n- Medium: ${data?.risk_summary?.medium ?? 0}\n- Low: ${data?.risk_summary?.low ?? 0}\n\n`
+
+    if (readinessChecklist.length > 0) {
+      report += '## Pre-Submission Readiness Checklist\n\n'
+      report += '| Status | Item | Details |\n|--------|------|---------|\n'
+      readinessChecklist.forEach(check => {
+        const statusIcon = check?.status === 'pass' ? 'PASS' : check?.status === 'fail' ? 'FAIL' : check?.status === 'warning' ? 'WARN' : 'N/A'
+        report += `| ${statusIcon} | ${check?.item ?? ''} | ${check?.details ?? ''} |\n`
+      })
+      report += '\n'
+    }
 
     if (data?.overall_assessment) {
       report += `## Overall Assessment\n${data.overall_assessment}\n\n`
@@ -1435,11 +1636,63 @@ export default function Page() {
                         </CardContent>
                       </Card>
 
+                      {/* 360 Deep Scan Toggle */}
+                      <Card className={`border shadow-lg transition-all duration-300 ${deepScan ? 'border-primary/40 shadow-[0_0_20px_hsl(265,89%,72%,0.15)]' : 'border-border'}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg transition-all duration-300 ${deepScan ? 'bg-primary/15 shadow-[0_0_12px_hsl(265,89%,72%,0.2)]' : 'bg-secondary/50'}`}>
+                                <VscVerified className={`w-5 h-5 transition-colors duration-300 ${deepScan ? 'text-primary' : 'text-muted-foreground'}`} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-bold tracking-tight">360-Degree Deep Scan</p>
+                                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 uppercase tracking-wider font-bold ${deepScan ? 'text-primary border-primary/40' : 'text-muted-foreground border-border'}`}>
+                                    {deepScan ? 'ON' : 'OFF'}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {deepScan
+                                    ? 'Exhaustive analysis covering all possible rejection vectors with pre-submission readiness checklist.'
+                                    : 'Standard compliance check against core App Store guidelines.'}
+                                </p>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={deepScan}
+                              onCheckedChange={setDeepScan}
+                              className="data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                          {deepScan && (
+                            <div className="mt-3 pt-3 border-t border-border/50">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {[
+                                  { label: 'Privacy & ATT', icon: <VscShield className="w-3 h-3" /> },
+                                  { label: 'Accessibility', icon: <VscInfo className="w-3 h-3" /> },
+                                  { label: 'Security & ATS', icon: <VscVerified className="w-3 h-3" /> },
+                                  { label: 'Background Modes', icon: <VscCode className="w-3 h-3" /> },
+                                  { label: 'Sign in with Apple', icon: <HiOutlineShieldCheck className="w-3 h-3" /> },
+                                  { label: 'StoreKit Compliance', icon: <VscFilter className="w-3 h-3" /> },
+                                  { label: 'Crash Safety', icon: <VscWarning className="w-3 h-3" /> },
+                                  { label: 'Readiness Checklist', icon: <VscCheck className="w-3 h-3" /> },
+                                ].map((item, idx) => (
+                                  <div key={idx} className="flex items-center gap-1.5 text-[10px] text-muted-foreground bg-secondary/30 rounded-md px-2 py-1.5">
+                                    <span className="text-primary">{item.icon}</span>
+                                    {item.label}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
                       {/* Run Button */}
                       <div className="flex justify-center pt-2">
-                        <Button onClick={runAnalysis} disabled={isLoading} size="lg" className="gap-2 px-8 shadow-[0_0_20px_hsl(265,89%,72%,0.3)] hover:shadow-[0_0_30px_hsl(265,89%,72%,0.5)] transition-all duration-300">
-                          <VscPlay className="w-4 h-4" />
-                          Run Compliance Check
+                        <Button onClick={runAnalysis} disabled={isLoading} size="lg" className={`gap-2 px-8 transition-all duration-300 ${deepScan ? 'shadow-[0_0_25px_hsl(265,89%,72%,0.4)] hover:shadow-[0_0_35px_hsl(265,89%,72%,0.6)]' : 'shadow-[0_0_20px_hsl(265,89%,72%,0.3)] hover:shadow-[0_0_30px_hsl(265,89%,72%,0.5)]'}`}>
+                          {deepScan ? <VscVerified className="w-4 h-4" /> : <VscPlay className="w-4 h-4" />}
+                          {deepScan ? 'Run 360 Deep Scan' : 'Run Compliance Check'}
                         </Button>
                       </div>
                     </div>
