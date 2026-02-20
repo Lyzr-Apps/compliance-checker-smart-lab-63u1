@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { VscShield, VscCode, VscSearch, VscHistory, VscBook, VscWarning, VscError, VscInfo, VscCheck, VscExport, VscClose, VscPlay, VscFilter } from 'react-icons/vsc'
+import { VscShield, VscCode, VscSearch, VscHistory, VscBook, VscWarning, VscError, VscInfo, VscCheck, VscExport, VscClose, VscPlay, VscFilter, VscRepoForked, VscTrash, VscFile } from 'react-icons/vsc'
 import { HiOutlineShieldCheck, HiOutlineExclamationTriangle, HiOutlineInformationCircle } from 'react-icons/hi2'
 
 // --- Constants ---
@@ -73,6 +73,42 @@ interface CategoryOption {
   id: string
   name: string
   checked: boolean
+}
+
+interface RepoFile {
+  path: string
+  content: string
+  size: number
+}
+
+// iOS-relevant file extensions for filtering
+const IOS_EXTENSIONS = ['.swift', '.m', '.mm', '.h', '.plist', '.storyboard', '.xib', '.entitlements', '.xcconfig', '.pbxproj', '.podfile', '.podspec']
+
+function isIOSRelevantFile(path: string): boolean {
+  const lower = path.toLowerCase()
+  return IOS_EXTENSIONS.some(ext => lower.endsWith(ext)) ||
+    lower.includes('podfile') ||
+    lower.includes('cartfile') ||
+    lower.includes('package.swift') ||
+    lower.includes('info.plist') ||
+    lower.endsWith('.json') && (lower.includes('config') || lower.includes('package'))
+}
+
+function parseGitHubUrl(url: string): { owner: string; repo: string; branch: string; path: string } | null {
+  try {
+    const cleaned = url.trim().replace(/\/+$/, '').replace(/\.git$/, '')
+    // Match: github.com/owner/repo or github.com/owner/repo/tree/branch/path
+    const match = cleaned.match(/github\.com\/([^/]+)\/([^/]+)(?:\/tree\/([^/]+)(?:\/(.*))?)?/)
+    if (!match) return null
+    return {
+      owner: match[1],
+      repo: match[2],
+      branch: match[3] || 'main',
+      path: match[4] || ''
+    }
+  } catch {
+    return null
+  }
 }
 
 // --- Sample Data ---
@@ -754,6 +790,172 @@ export default function Page() {
   // Sample Data toggle
   const [sampleDataOn, setSampleDataOn] = useState(false)
 
+  // GitHub repo state
+  const [repoUrl, setRepoUrl] = useState('')
+  const [repoFiles, setRepoFiles] = useState<RepoFile[]>([])
+  const [isFetchingRepo, setIsFetchingRepo] = useState(false)
+  const [repoError, setRepoError] = useState('')
+  const [repoFetchStatus, setRepoFetchStatus] = useState('')
+
+  // Fetch repo files from GitHub
+  const fetchRepoFiles = async () => {
+    if (!repoUrl.trim()) {
+      setRepoError('Please enter a GitHub repository URL.')
+      return
+    }
+
+    const parsed = parseGitHubUrl(repoUrl)
+    if (!parsed) {
+      setRepoError('Invalid GitHub URL. Expected format: https://github.com/owner/repo')
+      return
+    }
+
+    setIsFetchingRepo(true)
+    setRepoError('')
+    setRepoFiles([])
+    setRepoFetchStatus('Fetching repository tree...')
+
+    try {
+      // Step 1: Get the repo tree recursively via GitHub API
+      const treeUrl = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/git/trees/${parsed.branch}?recursive=1`
+      const treeRes = await fetch(treeUrl)
+
+      if (!treeRes.ok) {
+        if (treeRes.status === 404) {
+          // Try 'master' branch as fallback
+          const fallbackUrl = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/git/trees/master?recursive=1`
+          const fallbackRes = await fetch(fallbackUrl)
+          if (!fallbackRes.ok) {
+            throw new Error(`Repository not found or not public. Status: ${treeRes.status}`)
+          }
+          const fallbackData = await fallbackRes.json()
+          await processTree(fallbackData, parsed.owner, parsed.repo, 'master', parsed.path)
+          return
+        }
+        throw new Error(`GitHub API error: ${treeRes.status} ${treeRes.statusText}`)
+      }
+
+      const treeData = await treeRes.json()
+      await processTree(treeData, parsed.owner, parsed.repo, parsed.branch, parsed.path)
+    } catch (err) {
+      setRepoError(err instanceof Error ? err.message : 'Failed to fetch repository.')
+    } finally {
+      setIsFetchingRepo(false)
+      setRepoFetchStatus('')
+    }
+  }
+
+  const processTree = async (
+    treeData: { tree?: Array<{ path: string; type: string; size?: number }> },
+    owner: string,
+    repo: string,
+    branch: string,
+    subPath: string
+  ) => {
+    const tree = Array.isArray(treeData?.tree) ? treeData.tree : []
+
+    // Filter for iOS-relevant files
+    let relevantFiles = tree.filter(
+      (item) => item.type === 'blob' && isIOSRelevantFile(item.path) && (item.size ?? 0) < 100000
+    )
+
+    // If a subPath is specified, filter to only files within that directory
+    if (subPath) {
+      relevantFiles = relevantFiles.filter(f => f.path.startsWith(subPath))
+    }
+
+    if (relevantFiles.length === 0) {
+      setRepoError('No iOS-relevant source files found in this repository. Looked for .swift, .m, .h, .plist, .entitlements, and other iOS files.')
+      return
+    }
+
+    // Cap at 15 files to stay within reasonable token limits
+    const filesToFetch = relevantFiles.slice(0, 15)
+    setRepoFetchStatus(`Fetching ${filesToFetch.length} of ${relevantFiles.length} iOS files...`)
+
+    const fetchedFiles: RepoFile[] = []
+    for (let i = 0; i < filesToFetch.length; i++) {
+      const file = filesToFetch[i]
+      setRepoFetchStatus(`Fetching file ${i + 1}/${filesToFetch.length}: ${file.path}`)
+      try {
+        const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}?ref=${branch}`
+        const contentRes = await fetch(contentUrl)
+        if (contentRes.ok) {
+          const contentData = await contentRes.json()
+          if (contentData.content && contentData.encoding === 'base64') {
+            const decoded = atob(contentData.content.replace(/\n/g, ''))
+            fetchedFiles.push({
+              path: file.path,
+              content: decoded,
+              size: file.size ?? decoded.length
+            })
+          }
+        }
+      } catch {
+        // Skip files that fail to fetch
+      }
+    }
+
+    if (fetchedFiles.length === 0) {
+      setRepoError('Could not fetch any file contents from the repository.')
+      return
+    }
+
+    setRepoFiles(fetchedFiles)
+    setRepoFetchStatus('')
+
+    // Auto-populate the code snippet textarea with fetched code
+    const combinedCode = fetchedFiles
+      .map(f => `// === ${f.path} ===\n${f.content}`)
+      .join('\n\n')
+    setCodeSnippet(prev => {
+      if (prev.trim()) return prev + '\n\n' + combinedCode
+      return combinedCode
+    })
+
+    // Try to extract app name from project if not already set
+    if (!appName.trim()) {
+      const pbxproj = fetchedFiles.find(f => f.path.endsWith('.pbxproj'))
+      if (pbxproj) {
+        const nameMatch = pbxproj.content.match(/PRODUCT_NAME\s*=\s*"?([^";]+)"?/)
+        if (nameMatch) setAppName(nameMatch[1].trim())
+      } else {
+        // Use repo name as fallback
+        setAppName(repo.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))
+      }
+    }
+  }
+
+  const removeRepoFile = (path: string) => {
+    setRepoFiles(prev => prev.filter(f => f.path !== path))
+    // Also remove from code snippet
+    setCodeSnippet(prev => {
+      const marker = `// === ${path} ===`
+      const lines = prev.split('\n')
+      const newLines: string[] = []
+      let skipping = false
+      for (const line of lines) {
+        if (line.startsWith('// === ') && line.endsWith(' ===')) {
+          if (line === marker) {
+            skipping = true
+            continue
+          } else {
+            skipping = false
+          }
+        }
+        if (!skipping) newLines.push(line)
+      }
+      return newLines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+    })
+  }
+
+  const clearRepoFiles = () => {
+    setRepoFiles([])
+    setRepoUrl('')
+    setRepoError('')
+    setCodeSnippet('')
+  }
+
   // Load history from localStorage
   useEffect(() => {
     try {
@@ -794,6 +996,12 @@ export default function Page() {
     const kw = sampleDataOn && !keywords.trim() ? 'photo, backup, sync, cloud, storage, gallery, share' : keywords
     const age = sampleDataOn && !ageRating ? '4+' : ageRating
 
+    if (repoFiles.length > 0) {
+      const parsed = parseGitHubUrl(repoUrl)
+      if (parsed) {
+        message += `## Source: GitHub Repository\nRepository: ${parsed.owner}/${parsed.repo} (branch: ${parsed.branch})\nFiles analyzed: ${repoFiles.map(f => f.path).join(', ')}\n\n`
+      }
+    }
     if (code.trim()) {
       message += `## Code Snippets\n\`\`\`\n${code}\n\`\`\`\n\n`
     }
@@ -961,6 +1169,9 @@ export default function Page() {
       setAnalysisResult(null)
       setShowResults(false)
       setSelectedHistoryEntry(null)
+      setRepoUrl('')
+      setRepoFiles([])
+      setRepoError('')
       try {
         const saved = localStorage.getItem('compliance_history')
         if (saved) {
@@ -1031,8 +1242,94 @@ export default function Page() {
                           <VscShield className="w-8 h-8 text-primary" />
                         </div>
                         <h2 className="text-xl font-bold tracking-tight mb-1">App Store Compliance Analyzer</h2>
-                        <p className="text-sm text-muted-foreground max-w-lg mx-auto">Paste your code, describe your app, and check for App Store guideline violations before submitting for review.</p>
+                        <p className="text-sm text-muted-foreground max-w-lg mx-auto">Import a GitHub repo, paste your code, describe your app, and check for App Store guideline violations before submitting for review.</p>
                       </div>
+
+                      {/* GitHub Repo Import */}
+                      <Card className="border-border shadow-lg overflow-hidden">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <VscRepoForked className="w-4 h-4 text-primary" /> Import from GitHub
+                          </CardTitle>
+                          <CardDescription className="text-xs">Provide a public GitHub repository URL to automatically fetch and analyze iOS source files.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex gap-2">
+                            <Input
+                              value={repoUrl}
+                              onChange={(e) => setRepoUrl(e.target.value)}
+                              placeholder="https://github.com/owner/repo"
+                              className="bg-[hsl(231,18%,12%)] border-border text-sm font-mono flex-1"
+                              onKeyDown={(e) => { if (e.key === 'Enter' && !isFetchingRepo) fetchRepoFiles() }}
+                              disabled={isFetchingRepo}
+                            />
+                            <Button
+                              onClick={fetchRepoFiles}
+                              disabled={isFetchingRepo || !repoUrl.trim()}
+                              variant="outline"
+                              className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10 shrink-0"
+                            >
+                              {isFetchingRepo ? (
+                                <><div className="w-3.5 h-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" /> Fetching</>
+                              ) : (
+                                <><VscRepoForked className="w-3.5 h-3.5" /> Fetch Repo</>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Fetch status */}
+                          {isFetchingRepo && repoFetchStatus && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/30 rounded-lg px-3 py-2">
+                              <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin shrink-0" />
+                              <span className="truncate">{repoFetchStatus}</span>
+                            </div>
+                          )}
+
+                          {/* Repo error */}
+                          {repoError && (
+                            <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
+                              <VscError className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                              <span>{repoError}</span>
+                              <button onClick={() => setRepoError('')} className="ml-auto shrink-0 hover:text-destructive/80">
+                                <VscClose className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Fetched files list */}
+                          {repoFiles.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <VscCheck className="w-3.5 h-3.5 text-accent" />
+                                  <span className="text-xs font-semibold text-accent">{repoFiles.length} file{repoFiles.length !== 1 ? 's' : ''} fetched and loaded into code input</span>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={clearRepoFiles} className="text-muted-foreground hover:text-destructive h-7 gap-1 text-xs">
+                                  <VscTrash className="w-3 h-3" /> Clear All
+                                </Button>
+                              </div>
+                              <div className="bg-[hsl(231,18%,12%)] border border-border rounded-lg divide-y divide-border/50 max-h-48 overflow-y-auto">
+                                {repoFiles.map((file) => (
+                                  <div key={file.path} className="flex items-center gap-2 px-3 py-1.5 text-xs group hover:bg-secondary/20 transition-colors">
+                                    <VscFile className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                    <span className="font-mono text-foreground/80 truncate flex-1">{file.path}</span>
+                                    <span className="text-muted-foreground/50 text-[10px] shrink-0">{(file.size / 1024).toFixed(1)}KB</span>
+                                    <button
+                                      onClick={() => removeRepoFile(file.path)}
+                                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity shrink-0"
+                                    >
+                                      <VscClose className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-muted-foreground/60">
+                                Files have been appended to the Code Snippets field below. You can remove individual files or edit the code directly.
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
 
                       {/* Error */}
                       {errorMessage && (
