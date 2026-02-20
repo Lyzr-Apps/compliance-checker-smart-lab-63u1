@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { VscShield, VscCode, VscSearch, VscHistory, VscBook, VscWarning, VscError, VscInfo, VscCheck, VscExport, VscClose, VscPlay, VscFilter, VscRepoForked, VscTrash, VscFile, VscVerified, VscCircleFilled, VscDash } from 'react-icons/vsc'
+import { VscShield, VscCode, VscSearch, VscHistory, VscBook, VscWarning, VscError, VscInfo, VscCheck, VscExport, VscClose, VscPlay, VscFilter, VscRepoForked, VscTrash, VscFile, VscVerified, VscCircleFilled, VscDash, VscCopy, VscWand, VscTerminal, VscTools } from 'react-icons/vsc'
 import { HiOutlineShieldCheck, HiOutlineExclamationTriangle, HiOutlineInformationCircle } from 'react-icons/hi2'
 import { HiMiniShieldCheck, HiMiniXCircle, HiMiniExclamationTriangle, HiMiniMinusCircle } from 'react-icons/hi2'
 
@@ -89,6 +89,107 @@ interface RepoFile {
   content: string
   size: number
 }
+
+// --- Dev Environment Types ---
+interface DevEnvironment {
+  id: string
+  name: string
+  category: 'ide' | 'nocode' | 'lowcode'
+  icon: string
+  promptPrefix: string
+  contextNote: string
+}
+
+const DEV_ENVIRONMENTS: DevEnvironment[] = [
+  {
+    id: 'xcode',
+    name: 'Xcode',
+    category: 'ide',
+    icon: 'Xcode',
+    promptPrefix: 'In Xcode project',
+    contextNote: 'Navigate to the file in Xcode Project Navigator, apply the changes in the source editor, and rebuild.'
+  },
+  {
+    id: 'vscode',
+    name: 'VS Code',
+    category: 'ide',
+    icon: 'VS Code',
+    promptPrefix: 'In VS Code workspace',
+    contextNote: 'Open the file via Cmd/Ctrl+P, make the edits, and save. Run the build from the integrated terminal.'
+  },
+  {
+    id: 'appcode',
+    name: 'AppCode (JetBrains)',
+    category: 'ide',
+    icon: 'AppCode',
+    promptPrefix: 'In AppCode/JetBrains IDE',
+    contextNote: 'Use the project tree to navigate to the file, apply the refactoring, and rebuild the scheme.'
+  },
+  {
+    id: 'cursor',
+    name: 'Cursor',
+    category: 'ide',
+    icon: 'Cursor',
+    promptPrefix: 'In Cursor AI editor',
+    contextNote: 'You can paste this prompt directly into Cursor Chat (Cmd+L) and let Cursor apply the fix automatically.'
+  },
+  {
+    id: 'flutterflow',
+    name: 'FlutterFlow',
+    category: 'nocode',
+    icon: 'FlutterFlow',
+    promptPrefix: 'In FlutterFlow visual builder',
+    contextNote: 'Use the FlutterFlow UI editor to make these changes. Some fixes may require Custom Code blocks or Custom Actions.'
+  },
+  {
+    id: 'adalo',
+    name: 'Adalo',
+    category: 'nocode',
+    icon: 'Adalo',
+    promptPrefix: 'In Adalo app builder',
+    contextNote: 'Apply changes through the Adalo visual editor. For privacy and metadata issues, check the App Settings panel.'
+  },
+  {
+    id: 'thunkable',
+    name: 'Thunkable',
+    category: 'nocode',
+    icon: 'Thunkable',
+    promptPrefix: 'In Thunkable project',
+    contextNote: 'Use the Thunkable drag-and-drop editor and Blocks section. For compliance items, check Project Settings.'
+  },
+  {
+    id: 'bubble',
+    name: 'Bubble',
+    category: 'nocode',
+    icon: 'Bubble',
+    promptPrefix: 'In Bubble.io editor',
+    contextNote: 'Apply changes via the Bubble visual editor. For data privacy, check the Privacy tab and API settings.'
+  },
+  {
+    id: 'swiftui_playgrounds',
+    name: 'Swift Playgrounds',
+    category: 'ide',
+    icon: 'Swift Playgrounds',
+    promptPrefix: 'In Swift Playgrounds',
+    contextNote: 'Open the relevant source file in Swift Playgrounds and apply the code changes directly.'
+  },
+  {
+    id: 'react_native',
+    name: 'React Native (Expo)',
+    category: 'lowcode',
+    icon: 'Expo',
+    promptPrefix: 'In React Native / Expo project',
+    contextNote: 'Edit the relevant source files in your code editor, then rebuild using expo build:ios or eas build.'
+  },
+  {
+    id: 'other',
+    name: 'Other / Manual',
+    category: 'ide',
+    icon: 'Other',
+    promptPrefix: 'In your development environment',
+    contextNote: 'Apply the changes in your preferred editor or platform. Adjust the steps as needed for your specific setup.'
+  }
+]
 
 // iOS-relevant file extensions for filtering
 const IOS_EXTENSIONS = ['.swift', '.m', '.mm', '.h', '.plist', '.storyboard', '.xib', '.entitlements', '.xcconfig', '.pbxproj', '.podfile', '.podspec']
@@ -820,7 +921,337 @@ function ResultsDashboard({ result, onExport, onBack }: { result: AnalysisResult
           </CardContent>
         </Card>
       )}
+
+      {/* Fix Assistant */}
+      <FixAssistant result={result} />
     </div>
+  )
+}
+
+// --- Fix Prompt Generator ---
+function generateFixPrompt(
+  env: DevEnvironment,
+  violation: Violation,
+  categoryName: string
+): string {
+  const isNoCode = env.category === 'nocode'
+  const isLowCode = env.category === 'lowcode'
+
+  if (isNoCode) {
+    return `[${env.name} - Fix Required]
+
+Issue: ${violation.title}
+Severity: ${(violation.severity ?? 'unknown').toUpperCase()}
+Guideline: ${violation.guideline_reference ?? 'N/A'}
+Category: ${categoryName}
+
+What's wrong:
+${violation.description ?? ''}
+
+How to fix in ${env.name}:
+${violation.suggested_fix ?? ''}
+
+${env.contextNote}
+
+Since you're using ${env.name} (a ${env.category === 'nocode' ? 'no-code' : 'low-code'} platform), look for the relevant setting in your app's configuration panel or settings screen. If the fix requires code-level changes that aren't available in the visual editor, you may need to use a Custom Code/Action block or contact the platform's support for guidance on compliance requirements.`
+  }
+
+  if (isLowCode) {
+    return `[${env.name} - Fix Required]
+
+Issue: ${violation.title}
+Severity: ${(violation.severity ?? 'unknown').toUpperCase()}
+Guideline: ${violation.guideline_reference ?? 'N/A'}
+Category: ${categoryName}
+
+Problem:
+${violation.description ?? ''}
+
+${violation.affected_code && violation.affected_code !== 'N/A' ? `Affected code:\n${violation.affected_code}\n` : ''}
+Fix instructions for ${env.name}:
+${violation.suggested_fix ?? ''}
+
+${env.contextNote}`
+  }
+
+  // IDE prompt - more code-centric
+  return `${env.promptPrefix}, fix the following App Store compliance violation:
+
+Issue: ${violation.title}
+Severity: ${(violation.severity ?? 'unknown').toUpperCase()}
+Guideline: ${violation.guideline_reference ?? 'N/A'}
+Category: ${categoryName}
+
+Description:
+${violation.description ?? ''}
+
+${violation.affected_code && violation.affected_code !== 'N/A' ? `Current code:\n\`\`\`\n${violation.affected_code}\n\`\`\`\n` : ''}
+Required fix:
+${violation.suggested_fix ?? ''}
+
+${env.contextNote}`
+}
+
+function generateAllFixesPrompt(
+  env: DevEnvironment,
+  result: AnalysisResult
+): string {
+  const categories = Array.isArray(result?.categories) ? result.categories : []
+  const allViolations: { violation: Violation; category: string }[] = []
+
+  categories.forEach(cat => {
+    const violations = Array.isArray(cat?.violations) ? cat.violations : []
+    violations.forEach(v => {
+      allViolations.push({ violation: v, category: cat?.category_name ?? 'Unknown' })
+    })
+  })
+
+  if (allViolations.length === 0) return 'No violations found to fix.'
+
+  const isNoCode = env.category === 'nocode'
+
+  let prompt = `# App Store Compliance Fix Guide for ${env.name}\n`
+  prompt += `Platform: ${env.name} (${isNoCode ? 'No-Code' : env.category === 'lowcode' ? 'Low-Code' : 'IDE'})\n`
+  prompt += `Total issues: ${allViolations.length}\n`
+  prompt += `Score: ${result?.compliance_score ?? 'N/A'}/100\n\n`
+  prompt += `---\n\n`
+
+  // Sort by severity: high first
+  const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
+  allViolations.sort((a, b) => (severityOrder[a.violation.severity] ?? 3) - (severityOrder[b.violation.severity] ?? 3))
+
+  allViolations.forEach((item, idx) => {
+    prompt += `## Fix ${idx + 1}: ${item.violation.title}\n`
+    prompt += `Severity: ${(item.violation.severity ?? 'unknown').toUpperCase()} | ${item.violation.guideline_reference ?? ''} | ${item.category}\n\n`
+    prompt += `Problem: ${item.violation.description ?? ''}\n\n`
+
+    if (item.violation.affected_code && item.violation.affected_code !== 'N/A') {
+      if (isNoCode) {
+        prompt += `Related area: ${item.violation.affected_code}\n\n`
+      } else {
+        prompt += `Code: \`${item.violation.affected_code}\`\n\n`
+      }
+    }
+
+    prompt += `Fix: ${item.violation.suggested_fix ?? ''}\n\n`
+
+    if (isNoCode) {
+      prompt += `${env.name} Steps: Look for this in your app settings, configuration panel, or visual editor. If not available through the UI, check if ${env.name} offers a custom code/plugin option.\n\n`
+    }
+
+    prompt += `---\n\n`
+  })
+
+  prompt += `\n${env.contextNote}`
+
+  return prompt
+}
+
+// --- Fix Assistant Component ---
+function FixAssistant({ result }: { result: AnalysisResult }) {
+  const [selectedEnv, setSelectedEnv] = useState<string>('')
+  const [copiedId, setCopiedId] = useState<string>('')
+  const [showAssistant, setShowAssistant] = useState(false)
+  const [envCategory, setEnvCategory] = useState<string>('all')
+
+  const env = DEV_ENVIRONMENTS.find(e => e.id === selectedEnv)
+
+  const categories = Array.isArray(result?.categories) ? result.categories : []
+  const allViolations: { violation: Violation; category: string; id: string }[] = []
+  categories.forEach(cat => {
+    const violations = Array.isArray(cat?.violations) ? cat.violations : []
+    violations.forEach((v, idx) => {
+      allViolations.push({
+        violation: v,
+        category: cat?.category_name ?? 'Unknown',
+        id: `${cat?.category_name ?? 'cat'}-${idx}`
+      })
+    })
+  })
+
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(''), 2000)
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(''), 2000)
+    }
+  }
+
+  const filteredEnvs = envCategory === 'all'
+    ? DEV_ENVIRONMENTS
+    : DEV_ENVIRONMENTS.filter(e => e.category === envCategory)
+
+  if (allViolations.length === 0) return null
+
+  return (
+    <Card className="border-border shadow-lg">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <VscWand className="w-4 h-4 text-primary" /> Fix Assistant
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAssistant(!showAssistant)}
+            className="h-7 text-xs text-muted-foreground"
+          >
+            {showAssistant ? 'Collapse' : 'Get Fix Prompts'}
+          </Button>
+        </div>
+        <CardDescription className="text-xs">
+          Tell us where you built your app. We will generate tailored fix prompts you can copy and use directly in your development environment.
+        </CardDescription>
+      </CardHeader>
+
+      {showAssistant && (
+        <CardContent className="space-y-4">
+          {/* Environment Category Filter */}
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Where did you build your app?</Label>
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'ide', label: 'IDE / Code Editor' },
+                { id: 'nocode', label: 'No-Code Platform' },
+                { id: 'lowcode', label: 'Low-Code / Hybrid' }
+              ].map((cat) => (
+                <Button
+                  key={cat.id}
+                  variant={envCategory === cat.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setEnvCategory(cat.id)}
+                  className={`text-xs h-7 px-3 ${envCategory === cat.id ? 'shadow-[0_0_10px_hsl(265,89%,72%,0.3)]' : 'border-border'}`}
+                >
+                  {cat.label}
+                </Button>
+              ))}
+            </div>
+
+            {/* Environment Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {filteredEnvs.map((envOption) => (
+                <button
+                  key={envOption.id}
+                  onClick={() => setSelectedEnv(envOption.id)}
+                  className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-all duration-200 ${
+                    selectedEnv === envOption.id
+                      ? 'border-primary/50 bg-primary/10 shadow-[0_0_12px_hsl(265,89%,72%,0.15)]'
+                      : 'border-border hover:border-border/80 bg-card hover:bg-secondary/30'
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-md ${selectedEnv === envOption.id ? 'bg-primary/20' : 'bg-secondary/50'}`}>
+                    {envOption.category === 'ide' ? (
+                      <VscTerminal className={`w-3.5 h-3.5 ${selectedEnv === envOption.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                    ) : (
+                      <VscTools className={`w-3.5 h-3.5 ${selectedEnv === envOption.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-medium truncate ${selectedEnv === envOption.id ? 'text-primary' : ''}`}>
+                      {envOption.name}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 capitalize">{envOption.category === 'nocode' ? 'No-Code' : envOption.category === 'lowcode' ? 'Low-Code' : 'IDE'}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Generated Prompts */}
+          {env && (
+            <div className="space-y-3 pt-2">
+              <Separator />
+
+              {/* Selected environment info */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                    {env.name}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {allViolations.length} fix prompt{allViolations.length !== 1 ? 's' : ''} generated
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(generateAllFixesPrompt(env, result), 'all-fixes')}
+                  className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10 h-7 text-xs"
+                >
+                  {copiedId === 'all-fixes' ? (
+                    <><VscCheck className="w-3 h-3" /> Copied</>
+                  ) : (
+                    <><VscCopy className="w-3 h-3" /> Copy All Fixes</>
+                  )}
+                </Button>
+              </div>
+
+              {/* Context note for the platform */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <VscInfo className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-foreground/80">{env.contextNote}</p>
+                </div>
+              </div>
+
+              {/* Individual fix prompts */}
+              <div className="space-y-2">
+                {allViolations.map((item) => {
+                  const prompt = generateFixPrompt(env, item.violation, item.category)
+                  const isCopied = copiedId === item.id
+
+                  return (
+                    <div key={item.id} className="rounded-lg border border-border/50 overflow-hidden hover:border-primary/20 transition-all duration-200">
+                      <div className="flex items-center justify-between px-3 py-2 bg-secondary/20">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {item.violation.severity === 'high' && <VscError className="w-3.5 h-3.5 text-red-400 shrink-0" />}
+                          {item.violation.severity === 'medium' && <VscWarning className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                          {item.violation.severity === 'low' && <VscInfo className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                          <span className="text-xs font-medium truncate">{item.violation.title}</span>
+                          <Badge className={`text-[9px] px-1.5 py-0 h-4 shrink-0 ${getSeverityClasses(item.violation.severity ?? '')}`}>
+                            {item.violation.severity ?? 'unknown'}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(prompt, item.id)}
+                          className={`h-6 px-2 text-[10px] gap-1 shrink-0 ml-2 ${isCopied ? 'text-accent' : 'text-muted-foreground hover:text-primary'}`}
+                        >
+                          {isCopied ? (
+                            <><VscCheck className="w-3 h-3" /> Copied</>
+                          ) : (
+                            <><VscCopy className="w-3 h-3" /> Copy</>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="px-3 py-2">
+                        <pre className="text-[11px] text-foreground/70 font-mono whitespace-pre-wrap break-words max-h-32 overflow-y-auto leading-relaxed">
+                          {prompt}
+                        </pre>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
   )
 }
 
