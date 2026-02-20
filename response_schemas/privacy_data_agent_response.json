@@ -1,0 +1,36 @@
+{
+  "agent_name": "Privacy & Data Agent",
+  "agent_id": "6998889383c6cf5f62027116",
+  "description": "Evaluates code and app descriptions for privacy policy compliance, data collection practices, ATT framework usage, third-party SDK data sharing, and GDPR/CCPA alignment per Apple guidelines",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "category": "string",
+    "violations": [
+      {
+        "title": "string",
+        "severity": "string",
+        "guideline_reference": "string",
+        "description": "string",
+        "affected_code": "string",
+        "suggested_fix": "string"
+      }
+    ],
+    "summary": "string"
+  },
+  "example_response": {
+    "category": "Privacy & Data Handling",
+    "violations": [
+      {
+        "title": "Missing ATT Framework Implementation",
+        "severity": "high",
+        "guideline_reference": "Guideline 5.1.2",
+        "description": "App collects IDFA without implementing App Tracking Transparency framework",
+        "affected_code": "ASIdentifierManager.shared().advertisingIdentifier",
+        "suggested_fix": "Import AppTrackingTransparency and call ATTrackingManager.requestTrackingAuthorization before accessing IDFA"
+      }
+    ],
+    "summary": "1 high severity privacy violation found related to ATT framework"
+  }
+}

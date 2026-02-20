@@ -1,0 +1,25 @@
+{
+  "app_name": "App Store Compliance Analyzer",
+  "workflow": {
+    "nodes": [
+      {"id": "input_node", "type": "Input", "label": "Developer Input", "nodeCategory": "input"},
+      {"id": "manager_agent", "type": "Agent", "label": "Compliance Coordinator", "nodeCategory": "agent", "agent_id": "699888d562205d38ecc8323f"},
+      {"id": "privacy_agent", "type": "Agent", "label": "Privacy & Data Agent", "nodeCategory": "agent", "agent_id": "6998889383c6cf5f62027116"},
+      {"id": "uiux_agent", "type": "Agent", "label": "UI/UX & Technical Agent", "nodeCategory": "agent", "agent_id": "699888b9a6fa0c0e372ff9a4"},
+      {"id": "content_agent", "type": "Agent", "label": "Content & Monetization Agent", "nodeCategory": "agent", "agent_id": "699888ba5c09fa7c2b5b2be9"},
+      {"id": "metadata_agent", "type": "Agent", "label": "Metadata & Marketing Agent", "nodeCategory": "agent", "agent_id": "699888baa6fa0c0e372ff9a6"},
+      {"id": "output_node", "type": "Output", "label": "Compliance Report", "nodeCategory": "end"}
+    ],
+    "edges": [
+      {"source": "input_node", "target": "manager_agent"},
+      {"source": "manager_agent", "target": "privacy_agent"},
+      {"source": "manager_agent", "target": "uiux_agent"},
+      {"source": "manager_agent", "target": "content_agent"},
+      {"source": "manager_agent", "target": "metadata_agent"},
+      {"source": "privacy_agent", "target": "output_node"},
+      {"source": "uiux_agent", "target": "output_node"},
+      {"source": "content_agent", "target": "output_node"},
+      {"source": "metadata_agent", "target": "output_node"}
+    ]
+  }
+}

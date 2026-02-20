@@ -1,0 +1,36 @@
+{
+  "agent_name": "UI/UX & Technical Agent",
+  "agent_id": "699888b9a6fa0c0e372ff9a4",
+  "description": "Analyzes for Human Interface Guideline violations, minimum functionality requirements, API usage restrictions, background mode misuse, and performance/crash risks",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "category": "string",
+    "violations": [
+      {
+        "title": "string",
+        "severity": "string",
+        "guideline_reference": "string",
+        "description": "string",
+        "affected_code": "string",
+        "suggested_fix": "string"
+      }
+    ],
+    "summary": "string"
+  },
+  "example_response": {
+    "category": "UI/UX & Technical",
+    "violations": [
+      {
+        "title": "Private API Usage Detected",
+        "severity": "high",
+        "guideline_reference": "Guideline 2.5.1",
+        "description": "App uses private UIKit API _UIStatusBarForegroundView which is not allowed",
+        "affected_code": "_UIStatusBarForegroundView *statusBar = ...",
+        "suggested_fix": "Remove all references to private APIs and use public UIKit alternatives"
+      }
+    ],
+    "summary": "1 high severity technical violation found related to private API usage"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "app_name": "App Store Compliance Analyzer",
+  "pattern": "manager-subagent",
+  "agents": {
+    "manager": {
+      "agent_id": "699888d562205d38ecc8323f",
+      "name": "Compliance Coordinator",
+      "type": "manager",
+      "model": "gpt-4o-mini",
+      "provider": "openai",
+      "managed_agents": [
+        "6998889383c6cf5f62027116",
+        "699888b9a6fa0c0e372ff9a4",
+        "699888ba5c09fa7c2b5b2be9",
+        "699888baa6fa0c0e372ff9a6"
+      ]
+    },
+    "sub_agents": [
+      {
+        "agent_id": "6998889383c6cf5f62027116",
+        "name": "Privacy & Data Agent",
+        "type": "sub-agent",
+        "model": "gpt-4o-mini",
+        "provider": "openai"
+      },
+      {
+        "agent_id": "699888b9a6fa0c0e372ff9a4",
+        "name": "UI/UX & Technical Agent",
+        "type": "sub-agent",
+        "model": "gpt-4o-mini",
+        "provider": "openai"
+      },
+      {
+        "agent_id": "699888ba5c09fa7c2b5b2be9",
+        "name": "Content & Monetization Agent",
+        "type": "sub-agent",
+        "model": "gpt-4o-mini",
+        "provider": "openai"
+      },
+      {
+        "agent_id": "699888baa6fa0c0e372ff9a6",
+        "name": "Metadata & Marketing Agent",
+        "type": "sub-agent",
+        "model": "gpt-4o-mini",
+        "provider": "openai"
+      }
+    ]
+  },
+  "primary_agent_id": "699888d562205d38ecc8323f",
+  "all_agent_ids": [
+    "6998889383c6cf5f62027116",
+    "699888b9a6fa0c0e372ff9a4",
+    "699888ba5c09fa7c2b5b2be9",
+    "699888baa6fa0c0e372ff9a6",
+    "699888d562205d38ecc8323f"
+  ]
+}

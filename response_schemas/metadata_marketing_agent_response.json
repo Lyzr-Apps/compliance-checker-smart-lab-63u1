@@ -1,0 +1,36 @@
+{
+  "agent_name": "Metadata & Marketing Agent",
+  "agent_id": "699888baa6fa0c0e372ff9a6",
+  "description": "Checks app name, description, screenshots, and keywords for misleading claims, keyword stuffing, placeholder content, and Apple trademark misuse",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "category": "string",
+    "violations": [
+      {
+        "title": "string",
+        "severity": "string",
+        "guideline_reference": "string",
+        "description": "string",
+        "affected_code": "string",
+        "suggested_fix": "string"
+      }
+    ],
+    "summary": "string"
+  },
+  "example_response": {
+    "category": "Metadata & Marketing",
+    "violations": [
+      {
+        "title": "Keyword Stuffing in App Name",
+        "severity": "medium",
+        "guideline_reference": "Guideline 2.3.7",
+        "description": "App name contains excessive keywords: 'Best Photo Editor - Camera Filter Selfie Beauty Pic Collage'",
+        "affected_code": "CFBundleDisplayName = \"Best Photo Editor - Camera Filter Selfie Beauty Pic Collage\"",
+        "suggested_fix": "Shorten app name to 30 characters or less and remove keyword stuffing. Use a concise, descriptive name."
+      }
+    ],
+    "summary": "1 medium severity metadata violation found related to keyword stuffing"
+  }
+}

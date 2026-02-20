@@ -1,0 +1,36 @@
+{
+  "agent_name": "Content & Monetization Agent",
+  "agent_id": "699888ba5c09fa7c2b5b2be9",
+  "description": "Reviews for objectionable content flags, age rating accuracy, in-app purchase implementation correctness, subscription guideline adherence, and external payment link violations",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "category": "string",
+    "violations": [
+      {
+        "title": "string",
+        "severity": "string",
+        "guideline_reference": "string",
+        "description": "string",
+        "affected_code": "string",
+        "suggested_fix": "string"
+      }
+    ],
+    "summary": "string"
+  },
+  "example_response": {
+    "category": "Content & Monetization",
+    "violations": [
+      {
+        "title": "External Payment Link Violation",
+        "severity": "high",
+        "guideline_reference": "Guideline 3.1.1",
+        "description": "App contains a direct link to an external payment page for digital content purchases",
+        "affected_code": "UIApplication.shared.open(URL(string: \"https://example.com/buy\")!)",
+        "suggested_fix": "Remove external payment links for digital goods and implement StoreKit for in-app purchases"
+      }
+    ],
+    "summary": "1 high severity monetization violation found related to external payment links"
+  }
+}
